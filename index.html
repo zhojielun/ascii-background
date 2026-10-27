@@ -46,6 +46,11 @@
                transition: background-color .3s, color .3s; }
   body { font-family: var(--mono); }
   canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; }
+  /* The fish swim over the page, not behind it: the canvas is transparent and click-through,
+     so only the glyphs show. During the theme wipe it drops behind the copy, because the wipe
+     paints an opaque page-colour circle that would otherwise cover the text. */
+  #pond { z-index: 50; pointer-events: none; }
+  :root[data-transition="theme"] #pond { z-index: 10; }
 
   nav { position: fixed; inset-inline: 0; top: 0; z-index: 30; display: flex; justify-content: center;
         gap: 32px; padding-top: 32px; font-size: 13px; transition: color .2s; }

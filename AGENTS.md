@@ -50,6 +50,9 @@ unless asked. Keep `src/` directly browser-loadable (relative `.js` imports); th
   seam. The engine's theme reveal renders both palettes into live offscreen layers; the template
   recolors page text via `onFrame`. Do not replace this with View Transitions, whose snapshot
   freezes the fish.
+- In `index.html` the pond canvas sits above the page (`#pond { z-index: 50; pointer-events: none }`)
+  so the fish swim over the copy; during the wipe CSS drops it to `z-index: 10`, because the wipe's
+  opaque page-colour circle must stay behind the text. Keep the canvas click-through.
 - Preserve accessibility behavior: canvas is `aria-hidden`, forced-colors mode hides it, reduced
   motion slows the sim to 0.2x, and touch input ripples instead of hovering.
 - `step()` and `draw()` are hot loops over every creature/cell. Avoid per-step and per-cell
