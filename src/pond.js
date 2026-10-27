@@ -68,7 +68,7 @@ const WAKE_STEP = 1 / 60;
 const RIPPLE_SPEED = 52;
 /** Seconds the window must hold still before creatures are counted again: a drag may yet reverse. */
 const RESIZE_SETTLE = 1.5;
-const PELLET_LIFE = 14, PELLET_SINK = 9, PELLET_MAX = 24;
+const PELLET_LIFE = 14, PELLET_SINK = 9, PELLET_MAX = 100;
 const BITE_LIFE = 0.45;
 const THROW_RADIUS = 34;
 /** How visible a creature stays while it swims under page content. */
