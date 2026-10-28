@@ -224,19 +224,31 @@ function afterFrame({ renderer }) {
   }
 }
 
-/** Five different residents on every visit, from all the species the engine knows. */
-function randomResidents(count = 5) {
-  const names = Object.keys(SPECIES);
-  for (let i = names.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [names[i], names[j]] = [names[j], names[i]];
-  }
-  return names.slice(0, Math.min(count, names.length)).map((type) => ({ type, count: 1, young: 0 }));
+/** A working food chain every visit: three kinds of small fish at random, a shark plus one other
+ *  big hunter, and two wildcards from everything else. */
+function randomResidents() {
+  const shuffled = (list) => {
+    const out = [...list];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  };
+  // A species' `pool` is only known once it's built, so build throwaways to read it back.
+  const pool = (name) => Object.keys(SPECIES).filter((type) => SPECIES[type]({}).pool === name);
+  const small = shuffled(pool("small")).slice(0, 3).map((type) => ({ type, count: 2, young: 0 }));
+  const hunters = ["shark", ...shuffled(pool("large").filter((type) => type !== "shark")).slice(0, 1)]
+    .map((type) => ({ type, count: 1, young: 0 }));
+  const fixed = new Set([...small, ...hunters].map((s) => s.type));
+  const rest = shuffled(Object.keys(SPECIES).filter((type) => !fixed.has(type)))
+    .slice(0, 2).map((type) => ({ type, count: 1, young: 0 }));
+  return [...small, ...hunters, ...rest];
 }
 
 const initialLight = storedTheme() ? storedTheme() === "light" : prefersLight.matches;
 const pond = mount(canvas, {
-  species: randomResidents(5),
+  species: randomResidents(),
   theme: initialLight ? "light" : "dark",
   onFrame: afterFrame,
 });

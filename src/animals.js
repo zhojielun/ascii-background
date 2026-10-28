@@ -6,6 +6,7 @@ import {
 
 // ─── shared helpers ─────────────────────────────────────────────────────────
 const PUSH = { x: 0, y: 0 };
+const FLEE = { x: 0, y: 0 };
 /** A guard against a stray count="Infinity" in markup. */
 const MAX_COUNT = 4;
 
@@ -24,6 +25,18 @@ function spawnAt(pond, depth, margin = 0.12) {
     phase: rand(0, TAU),
     wander: 0,
   };
+}
+
+/** Just outside an edge, heading in: replacements arrive instead of popping into view. */
+function spawnAtEdge(pond, depth, size = 24) {
+  const W = pond.width, H = pond.height;
+  const edge = Math.floor(rand(0, 4));
+  let x, y, heading;
+  if (edge === 0) { x = -size; y = rand(H * 0.15, H * 0.85); heading = 0; }
+  else if (edge === 1) { x = W + size; y = rand(H * 0.15, H * 0.85); heading = Math.PI; }
+  else if (edge === 2) { x = rand(W * 0.15, W * 0.85); y = -size; heading = Math.PI / 2; }
+  else { x = rand(W * 0.15, W * 0.85); y = H + size; heading = -Math.PI / 2; }
+  return { x, y, heading, depth, phase: rand(0, TAU), wander: 0 };
 }
 
 function seedSpecies(pond, species, make, config, cap = MAX_COUNT) {
@@ -135,6 +148,20 @@ function nearestPellet(pond, x, y, range) {
     if (!p.landed) continue;
     const d = (p.x - x) ** 2 + (p.y - y) ** 2;
     if (d < bestD) { bestD = d; best = p; }
+  }
+  return best;
+}
+
+/** Nearest creature that could eat (x, y): larger and marked as a predator. */
+function predatorNear(pond, x, y, length, range, self = null, factor = 1.15) {
+  let best = null, bestD = range * range;
+  const kind = self && self.species;
+  for (const o of pond.creatures) {
+    if (o === self || o.gone || (kind && o.species === kind)) continue;
+    if (!o.species.predator || o.length < length * factor) continue;
+    const ox = o.nodes ? o.nodes[0] : o.x, oy = o.nodes ? o.nodes[1] : o.y;
+    const d = (ox - x) ** 2 + (oy - y) ** 2;
+    if (d < bestD) { bestD = d; best = o; }
   }
   return best;
 }
@@ -764,12 +791,16 @@ export function dragonfly(config = {}) {
 }
 
 // ─── minnows: one creature that draws a small school ────────────────────────
-function spawnSchool(pond, species) {
+function spawnSchool(pond, species, offscreen = false) {
   const s = {
     species, id: pond.nextId++,
-    ...spawnAt(pond, 0.58, 0.12),
+    ...(offscreen ? spawnAtEdge(pond, 0.58, 34) : spawnAt(pond, 0.58, 0.12)),
     length: 14,
     speed: rand(34, 46),
+    panic: 0,
+    fleeX: 0,
+    fleeY: 0,
+    nextRipple: 0,
     members: [],
   };
   const n = 5 + Math.floor(Math.random() * 3);
@@ -786,16 +817,33 @@ function spawnSchool(pond, species) {
 }
 
 function stepSchool(pond, s, dt) {
-  const food = nearestPellet(pond, s.x, s.y, 280);
+  const t = pond.time;
+  // A predator scatters the school; the replacement fish still enters from an edge later.
+  const threat = predatorNear(pond, s.x, s.y, s.length, 240, s, 1.2);
+  if (threat) { s.panic = 1; s.fleeX = threat.x; s.fleeY = threat.y; }
+  else s.panic = Math.max(0, s.panic - dt * 0.9);
+  const scared = s.panic > 0.2;
+  const food = scared ? null : nearestPellet(pond, s.x, s.y, 280);
   if (food) {
     const dist = Math.hypot(food.x - s.x, food.y - s.y);
     if (dist < 26) eat(pond, s.x, s.y, 28);
   }
+  let goal = food;
+  if (scared) {
+    const dx = s.x - s.fleeX, dy = s.y - s.fleeY, d = Math.hypot(dx, dy) || 1;
+    FLEE.x = s.x + (dx / d) * 160;
+    FLEE.y = s.y + (dy / d) * 160;
+    goal = FLEE;
+  }
   swim(pond, s, dt, {
-    speed: food ? 56 : s.speed, goal: food, turn: 3.2, wander: 0.45,
-    avoid: 60, margin: 28,
+    speed: scared ? 82 : food ? 56 : s.speed, goal, turn: scared ? 5 : 3.2,
+    wander: scared ? 0.2 : 0.45, avoid: 60, margin: 28,
   });
-  for (const m of s.members) m.a += m.spin * dt;
+  if (scared && t > s.nextRipple) {
+    ripple(pond, s.x, s.y, 0.12);
+    s.nextRipple = t + rand(0.15, 0.35);
+  }
+  for (const m of s.members) m.a += m.spin * dt * (scared ? 2.2 : 1);
 }
 
 function drawSchool(r, s, t) {
@@ -832,8 +880,12 @@ export function minnows(config = {}) {
   const species = {
     name: "minnows",
     colors: COLORS.minnows,
+    prey: true,
+    pool: "small",
+    limit: 2,
     seed: (pond) => seedSpecies(pond, species, spawnSchool, config, 2),
-    grow: (pond) => growSpecies(pond, species, spawnSchool, config, 2),
+    // The school is one creature; a pool replacement starts at an edge like the others.
+    spawn: (pond, offscreen) => { pond.creatures.push(spawnSchool(pond, species, offscreen)); },
     step: stepSchool,
     draw: drawSchool,
     wake: wakeSchool,
@@ -1024,3 +1076,9 @@ export function newt(config = {}) {
 
 /** Everything the engine can mount by name. */
 export const ANIMALS = { duck, turtle, strider, frog, dragonfly, minnows, crayfish, newt };
+
+// Shared with fish.js (predators and their prey) so both modules draw and steer the same way.
+export {
+  paint, put, ellipse, ellipseShadow, line, nearestPellet, predatorNear, ripple, eat,
+  spawnAt, spawnAtEdge, countOf,
+};

@@ -8,6 +8,7 @@
 import { TAU, clamp, rand, smoothstep, mix, packRgb, lineGlyph, compact } from "./util.js";
 import { koi } from "./koi.js";
 import { ANIMALS } from "./animals.js";
+import { FISH } from "./fish.js";
 
 /**
  * Species available by name. A species is an object with:
@@ -16,11 +17,12 @@ import { ANIMALS } from "./animals.js";
  *                                                     a resize has settled, to suit the new size
  *   step(pond, creature, dt)                          move one creature one sim step
  *   draw(renderer, creature, time)                    write its cells into renderer.grid
+ *   prey? predator? pool? limit? spawn?(pond, offscreen)  food-chain tags and meal replacement
  *   wake?(renderer, creature)  splash?(pond, pellet)  floating?(pond, pellet)
  * Each creature needs `species` and a `depth` (0 deep … 1 surface; draw order); setting `gone`
  * on one removes it after the step.
  */
-export const SPECIES = { koi, ...ANIMALS };
+export const SPECIES = { koi, ...ANIMALS, ...FISH };
 
 // ─── palette ────────────────────────────────────────────────────────────────
 // The page background and the tile background (bg) differ on purpose: tiles are
@@ -90,6 +92,8 @@ export class Pond {
     this.pellets = [];
     this.ripples = [];
     this.bites = [];
+    /** Creatures added after the current step, so a meal never mutates the list mid-loop. */
+    this.spawnQueue = [];
     this.width = 0;
     this.height = 0;
     this.time = 0;
@@ -129,7 +133,13 @@ export class Pond {
       this.settleAt = 0;
       for (const s of this.species) s.grow?.(this);
     }
-    for (const c of this.creatures) c.species.step(this, c, dt);
+    for (const c of this.creatures) if (!c.gone) c.species.step(this, c, dt);
+    for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
+      const s = this.spawnQueue[i];
+      if (this.time < s.at) continue;
+      this.spawnQueue.splice(i, 1);
+      s.make(this);
+    }
     compact(this.creatures, (c) => !c.gone);
 
     const t = this.time;

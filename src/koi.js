@@ -3,6 +3,7 @@
 import {
   TAU, clamp, rand, smoothstep, angleDiff, mix, shade, ramp, packRgb, hash3, valueNoise, lineGlyph, repel, compact,
 } from "./util.js";
+import { predatorNear } from "./animals.js";
 
 // ─── constants ──────────────────────────────────────────────────────────────
 const TILE_GLYPHS = "t%SX8@#";              // dense in shadow, sparse in light
@@ -296,6 +297,17 @@ function grow(pond, species, config) {
   }
 }
 
+/** When a koi is eaten, put back the age class the pond is short of, so its mix never drifts. */
+function replacementYoung(pond, species, config) {
+  const want = wanted(pond, config);
+  let adults = 0, young = 0;
+  for (const k of pond.creatures) {
+    if (k.species !== species || k.gone || k.leaving) continue;
+    if (k.young) young++; else adults++;
+  }
+  return (want.juveniles - young) > (want.adults - adults);
+}
+
 /**
  * A pellet hit the water. The splash is what koi react to: everyone in range bolts for it, each
  * after its own beat — nearer and bolder koi first — so the pond doesn't jump as one.
@@ -343,6 +355,12 @@ function step(pond, k, dt) {
   const L = k.length, nodes = k.nodes;
   const hx = nodes[0], hy = nodes[1];
   const cruise = 12 + L * 0.05;
+
+  // A larger predator close by triggers the same C-start as an unseen shadow.
+  if (k.startle < 0.35) {
+    const threat = predatorNear(pond, hx, hy, L, Math.max(L * 3, 240), k, 1.2);
+    if (threat) spook(pond, k, threat.x, threat.y);
+  }
 
   let dx = Math.cos(k.heading), dy = Math.sin(k.heading);
   // A random walk: its step scales with √dt, so the wander is the same at any STEP.
@@ -972,7 +990,9 @@ export function koi(config = {}) {
   const species = {
     name: "koi",
     colors: COLORS,
+    prey: true,
     seed: (pond) => seed(pond, species, config),
+    spawn: (pond) => spawn(pond, species, { offscreen: true, young: replacementYoung(pond, species, config) }),
     grow: (pond) => grow(pond, species, config),
     splash: (pond, p) => splash(pond, species, p),
     floating: (pond, p) => floating(pond, species, p),
