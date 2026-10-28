@@ -52,6 +52,10 @@ snippet loads `src/pond.js` from `@main`, so `main` is the version embedders loa
   object through `species` (detected by the presence of `.step`). Add theme colors under
   `colors.dark` / `colors.light` without colliding with existing palette keys. `count` clamps to
   8 koi, 4 of most species, 2 sharks/tuna/perch, and 2 minnow schools (one school is one creature).
+- `mount()` completes the food chain after resolving `species` (`completeFoodChain`): if the
+  selection contains any fish (`prey` or `predator`), a missing `pool: "large"` or `pool: "small"`
+  side is filled with the default `shark` / `guppy`. Non-fish ponds are untouched, so
+  `species="duck,turtle,strider"` stays as written, while the default `koi` gains a shark and a guppy.
 - Predation is tag-based. Only `predator` species hunt, only `prey` species can be eaten, and prey
   must be at most `preyRatio × hunter.length`; same-species cannibalism is blocked. A catch sets
   `gone` and pushes one replacement into `pond.spawnQueue`; the queue drains after creature steps

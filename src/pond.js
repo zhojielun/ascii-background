@@ -605,10 +605,24 @@ const DEFAULTS = {
 
 function resolveSpecies(entry) {
   if (typeof entry === "object" && entry.step) return entry;
-  const { type, ...config } = typeof entry === "string" ? { type: entry } : entry;
+  const { type, ...config } = typeof entry === "string" ? { type } : entry;
   const make = SPECIES[type];
   if (!make) throw new Error(`ascii-pond: unknown species "${type}" (have: ${Object.keys(SPECIES).join(", ")})`);
   return make(config);
+}
+
+/**
+ * A pond that has any fish at all keeps a working food chain: if the selection leaves out a big
+ * fish or a small fish, fill that side in with a default. Ponds with no fish (ducks, turtles, …)
+ * are left exactly as asked. Creatures are tagged `prey`/`predator`; the replacement pools are
+ * named `small` and `large`.
+ */
+const FOOD_CHAIN_FILL = { large: "shark", small: "guppy" };
+function completeFoodChain(species) {
+  if (!species.some((s) => s.prey || s.predator)) return;
+  for (const pool of ["large", "small"]) {
+    if (!species.some((s) => s.pool === pool)) species.push(SPECIES[FOOD_CHAIN_FILL[pool]]({}));
+  }
 }
 
 /**
@@ -618,6 +632,7 @@ function resolveSpecies(entry) {
 export function mount(target, options = {}) {
   const o = { ...DEFAULTS, ...options };
   const species = o.species.map(resolveSpecies);
+  completeFoodChain(species);
   const themes = {};
   for (const [name, base] of [["dark", DARK], ["light", LIGHT]]) {
     themes[name] = Object.assign({}, base, ...species.map((s) => s.colors?.[name]), o.palette[name]);

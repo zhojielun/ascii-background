@@ -129,6 +129,11 @@ small fish, a tuna can take small fish and the smallest koi, and a perch only ta
 minnow schools — while a shark can eat the perch in turn. Koi, minnow schools and the small fish flee
 when a hunter comes close.
 
+The engine keeps the chain complete: if the selection includes any fish but leaves out a big fish or a
+small fish, the missing side is filled in — a shark for the big side, a guppy for the small. So the
+default `koi` actually brings a shark and a guppy along; a pond with no fish at all (ducks, turtles, …)
+is left exactly as asked.
+
 After a catch the hunter is full for a random spell (a shark 20–36 s, a tuna 16–30 s, a perch 12–24 s):
 it stops chasing live prey but still takes pellets. The eaten fish is replaced just off-screen by a
 random species from the same pool (`small` for guppies, tetras, danios, platies, corys and minnow
